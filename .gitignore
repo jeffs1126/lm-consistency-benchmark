@@ -1,0 +1,10 @@
+.env
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+results/*.jsonl
+results/*.json
+data/cache/
+.jupyter/
+*.ipynb_checkpoints/
