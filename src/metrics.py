@@ -75,7 +75,7 @@ def krippendorff_alpha(df: pd.DataFrame) -> float:
         columns="paraphrase_idx",
         values="predicted",
         aggfunc="first",
-    ).applymap(lambda x: letter_map.get(x, np.nan))
+    ).map(lambda x: letter_map.get(x, np.nan))
 
     data = pivot.values.T  # shape: (n_raters, n_units)
     try:
@@ -137,6 +137,9 @@ def paws_accuracy(df: pd.DataFrame) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 def full_mmlu_report(df: pd.DataFrame, model_name: str) -> dict:
+    if df.empty or "original_idx" not in df.columns:
+        print("[error] No results to report — all API calls may have failed. Check your API key.")
+        return {"model": model_name, "error": "no results"}
     r, p = accuracy_consistency_correlation(df)
     return {
         "model": model_name,

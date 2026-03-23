@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 from src.data_loader import load_paws, load_mmlu
 from src.paraphrase import generate_paraphrases
@@ -56,6 +56,11 @@ def run_mmlu(model: str, provider: str, n_questions: int, n_paraphrases: int) ->
     with open(report_path, "w") as f:
         json.dump(report, f, indent=2)
     print(f"\nReport saved to {report_path}")
+
+    if "error" in report:
+        print(f"  [error] {report['error']}")
+        return report
+
     print(f"  Consistency Rate : {report['overall_consistency_rate']:.1%}")
     print(f"  Accuracy         : {report['overall_accuracy']:.1%}")
     print(f"  Krippendorff α   : {report['krippendorff_alpha']:.3f}")

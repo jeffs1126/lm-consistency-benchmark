@@ -90,7 +90,7 @@ def plot_consistency_heatmap(df: pd.DataFrame, model_name: str, top_n: int = 40)
         columns="paraphrase_idx",
         values="predicted",
         aggfunc="first",
-    ).applymap(lambda x: letter_map.get(x, -1))
+    ).map(lambda x: letter_map.get(x, -1))
 
     pivot = pivot.head(top_n)
     fig, ax = plt.subplots(figsize=(8, 10))

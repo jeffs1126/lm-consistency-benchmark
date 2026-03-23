@@ -82,6 +82,12 @@ def generate_paraphrases(
                         messages=[{"role": "user", "content": _paraphrase_prompt(row["question"], n_paraphrases)}],
                     )
                     raw = response.content[0].text.strip()
+                    # Strip markdown code fences if present
+                    if raw.startswith("```"):
+                        raw = raw.split("```", 2)[1]
+                        if raw.startswith("json"):
+                            raw = raw[4:]
+                        raw = raw.strip()
                     paraphrases = json.loads(raw)
                     if not isinstance(paraphrases, list):
                         raise ValueError("Expected JSON array")
