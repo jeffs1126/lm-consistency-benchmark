@@ -18,7 +18,7 @@ We introduce a two-track evaluation framework for measuring **paraphrase sensiti
 1. **Paraphrase Consistency (MMLU Track):** For each multiple-choice question, we generate semantically equivalent restatements using an auxiliary LLM and measure whether the target model answers identically across all variants.
 2. **Order Sensitivity (PAWS Track):** Using adversarially constructed sentence pairs, we measure whether swapping the presentation order of a pair changes the model's paraphrase judgment.
 
-Results reveal substantial sensitivity: at n=500, tested models change their answers on **~47% of paraphrased MMLU questions** and exhibit a **41% flip rate on PAWS order-swapped pairs**, with meaningful variation across subject domains and pair types.
+Results reveal substantial and model-dependent sensitivity: Claude Haiku changes its answer on **~47% of paraphrased MMLU questions** (Krippendorff's α = 0.493, below reliability threshold), while GPT-4o-mini achieves **77.9% consistency** (α = 0.835, crossing the reliability threshold). On PAWS, Claude Haiku flips 41.4% of pairs vs. 16.0% for GPT-4o-mini — yet the two models show qualitatively different sensitivity profiles that reveal distinct reasoning behaviors.
 
 ### Why This Matters
 
@@ -122,52 +122,79 @@ Adversarial prompts test robustness to malicious inputs; paraphrases test consis
 
 ## Results
 
-> Current results: `claude-haiku-4-5-20251001`. Comparative results with `gpt-4o-mini` are being collected and will be added. Bootstrap 95% CIs computed over 500 resamples.
+> All results use n=456–500 samples per track. Bootstrap 95% CIs computed over 500 resamples.
 
-### MMLU — Paraphrase Consistency
+### Model Comparison Summary
 
-**Setting:** `claude-haiku-4-5-20251001` · n=348 questions · 3 paraphrases each
+#### MMLU — Paraphrase Consistency
 
-| Metric | Value | 95% CI |
-|---|---|---|
-| **Consistency Rate** | **47.4%** | 43.6% – 51.4% |
-| Accuracy | 30.3% | 27.8% – 32.7% |
-| Krippendorff's α | 0.493 | 0.452 – 0.531 |
+| Metric | Claude Haiku | GPT-4o-mini | Δ |
+|---|---|---|---|
+| **Consistency Rate** | **47.4%** (43.6–51.4%) | **77.9%** (75.1–81.0%) | +30.5pp |
+| Accuracy | 30.3% (27.8–32.7%) | 74.6% (72.7–76.7%) | +44.3pp |
+| Krippendorff's α | 0.493 (0.452–0.531) | **0.835** (0.813–0.860) | +0.342 |
 
-> **Interpretation:** Krippendorff's α = 0.493 falls well below the acceptable reliability threshold (α ≥ 0.667). The tight 95% CI on consistency rate (43.6–51.4%) confirms this is not a small-sample artifact — the model changes its answer on roughly **half** of semantically equivalent question variants.
+#### PAWS — Order Sensitivity
 
-**Per-category breakdown:**
-
-| Category | Consistency Rate | Accuracy |
-|---|---|---|
-| STEM | ~50–65% | ~30–35% |
-| Social Sciences | ~45–55% | ~35–42% |
-| Humanities | ~25–35% | ~42–48% |
-| Professional / Applied | ~55–65% | ~26–32% |
-
-> **Key pattern:** Humanities shows the most striking result — **lowest consistency, highest accuracy** — suggesting the model answers correctly but through a brittle reasoning path that varies with question phrasing.
-
-![Consistency by Category](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
-![Accuracy vs Consistency](figures/acc_vs_consistency_claude-haiku-4-5-20251001.png)
-![Original vs Paraphrase Accuracy](figures/orig_vs_para_accuracy_claude-haiku-4-5-20251001.png)
-![Answer Heatmap](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
+| Metric | Claude Haiku | GPT-4o-mini | Δ |
+|---|---|---|---|
+| **Flip Rate (overall)** | **41.4%** (37.2–45.6%) | **16.0%** (13.0–19.4%) | −25.4pp |
+| Flip Rate (true paraphrases) | 23.9% | 14.4% | −9.5pp |
+| Flip Rate (non-paraphrases) | 55.4% | 17.3% | −38.1pp |
+| Forward Accuracy | 60.0% | 78.6% | +18.6pp |
 
 ---
 
-### PAWS — Order Sensitivity
+### Key Findings
 
-**Setting:** `claude-haiku-4-5-20251001` · n=500 pairs
+**Finding 1 — Large consistency gap between models.**
+GPT-4o-mini achieves 77.9% consistency vs. 47.4% for Claude Haiku on MMLU — a 30.5 percentage point gap. GPT-4o-mini's Krippendorff's α = 0.835 crosses the reliability threshold (α ≥ 0.8); Claude Haiku's α = 0.493 falls well below acceptable reliability.
 
-| Metric | Value | 95% CI |
-|---|---|---|
-| **Flip Rate (overall)** | **41.4%** | 37.2% – 45.6% |
-| Flip Rate (true paraphrases) | 23.9% | — |
-| Flip Rate (non-paraphrases) | 55.4% | — |
-| Forward Accuracy | 60.0% | — |
+**Finding 2 — PAWS reveals qualitatively different sensitivity profiles.**
+Claude Haiku shows a **2.3× difference** in flip rate between true paraphrases (23.9%) and non-paraphrases (55.4%), indicating it picks up genuine semantic signal but remains highly order-sensitive. GPT-4o-mini shows nearly identical flip rates across both classes (14.4% vs 17.3%, **1.2× ratio**) — suggesting it is anchored to its initial classification regardless of pair type, not that it reasons about meaning more carefully.
 
-> **Key pattern:** The **2.3× difference** in flip rate between true paraphrases (23.9%) and non-paraphrases (55.4%) confirms the model captures genuine semantic signal. The overall 41.4% flip rate (95% CI: 37.2–45.6%) is substantially above chance (50% would be random), confirming a real but incomplete sensitivity to input ordering. The pilot n=100 estimate of 49% was inflated; n=500 stabilizes near 41%.
+**Finding 3 — Accuracy–Consistency are correlated but distinct.**
+The Pearson correlation between per-question accuracy and consistency is r=0.40 (p<1e-18) for GPT-4o-mini — harder questions are less consistent, but the relationship is moderate, not deterministic. Inconsistency is not simply a proxy for difficulty.
 
-![PAWS Flip Rate](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
+**Finding 4 — Humanities is the most brittle domain for both models.**
+Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its highest accuracy (~42–48%) in that domain — a confidence-without-stability pattern. GPT-4o-mini is more consistent across all domains but shows the smallest consistency advantage in STEM (70.0% vs ~50–65%).
+
+---
+
+### Detailed Results — Claude Haiku
+
+**MMLU per-category:**
+
+| Category | Consistency Rate | Accuracy | n |
+|---|---|---|---|
+| STEM | — | — | 160 |
+| Humanities | — | — | 96 |
+| Social Sciences | — | — | 80 |
+| Professional / Applied | — | — | 120 |
+
+![Consistency by Category (Haiku)](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
+![Accuracy vs Consistency (Haiku)](figures/acc_vs_consistency_claude-haiku-4-5-20251001.png)
+![Original vs Paraphrase Accuracy (Haiku)](figures/orig_vs_para_accuracy_claude-haiku-4-5-20251001.png)
+![Answer Heatmap (Haiku)](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
+![PAWS Flip Rate (Haiku)](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
+
+---
+
+### Detailed Results — GPT-4o-mini
+
+**MMLU per-category:**
+
+| Category | Consistency Rate | Accuracy | n |
+|---|---|---|---|
+| STEM | 70.0% | 66.7% | 160 |
+| Humanities | 79.2% | 78.1% | 96 |
+| Social Sciences | 88.8% | 79.7% | 80 |
+| Professional / Applied | 80.0% | 79.0% | 120 |
+
+![Consistency by Category (GPT-4o-mini)](figures/consistency_by_category_gpt-4o-mini.png)
+![Accuracy vs Consistency (GPT-4o-mini)](figures/acc_vs_consistency_gpt-4o-mini.png)
+![Original vs Paraphrase Accuracy (GPT-4o-mini)](figures/orig_vs_para_accuracy_gpt-4o-mini.png)
+![Answer Heatmap (GPT-4o-mini)](figures/answer_heatmap_gpt-4o-mini.png)
 
 ---
 
