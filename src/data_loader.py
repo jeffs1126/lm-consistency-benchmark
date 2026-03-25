@@ -138,6 +138,34 @@ def _subject_to_category(subject: str) -> str:
     return "Other"
 
 
+def _load_mmlu_subject_arrow(subject: str, split: str = "test") -> Optional[pd.DataFrame]:
+    """
+    Load a single MMLU subject directly from cached Arrow IPC stream files.
+    This bypasses the datasets Feature type compatibility issue between Python versions.
+    """
+    import pyarrow as pa
+    import glob, os
+
+    cache_base = os.path.expanduser(
+        f"~/.cache/huggingface/datasets/cais___mmlu/{subject}"
+    )
+    pattern = f"{cache_base}/**/*-{split}.arrow"
+    files = glob.glob(pattern, recursive=True)
+    if not files:
+        return None
+
+    reader = pa.ipc.open_stream(files[0])
+    table = reader.read_all()
+    df = table.to_pandas()
+
+    # choices may be stored as pyarrow list — convert to plain Python list
+    if "choices" in df.columns:
+        df["choices"] = df["choices"].apply(
+            lambda x: list(x) if hasattr(x, "__iter__") and not isinstance(x, str) else x
+        )
+    return df
+
+
 def load_mmlu(
     subjects: Optional[list[str]] = None,
     split: str = "test",
@@ -148,23 +176,48 @@ def load_mmlu(
 
     Each row has:
         subject, category, question, choices (list[str]), answer_idx (0-3), answer_letter
+
+    Falls back to reading Arrow IPC stream files directly from the HuggingFace cache
+    when the datasets library cannot parse the cached feature schema (common across
+    Python / datasets version boundaries).
     """
     subjects = subjects or MMLU_SUBJECTS
     records = []
 
     for subject in subjects:
+        df = None
+
+        # Primary: standard HuggingFace datasets API
         try:
             ds = load_dataset("cais/mmlu", subject, split=split)
             df = ds.to_pandas()
+        except Exception:
+            pass
 
-            if max_per_subject:
-                df = df.sample(n=min(max_per_subject, len(df)), random_state=42)
+        # Fallback: read Arrow IPC stream directly from cache
+        if df is None:
+            try:
+                df = _load_mmlu_subject_arrow(subject, split)
+            except Exception as e:
+                print(f"[warn] Could not load {subject}: {e}")
+                continue
 
-            df["subject"] = subject
-            df["category"] = _subject_to_category(subject)
-            records.append(df)
-        except Exception as e:
-            print(f"[warn] Could not load {subject}: {e}")
+        if df is None:
+            print(f"[warn] Skipping {subject}: not in cache and HF unreachable")
+            continue
+
+        if max_per_subject:
+            df = df.sample(n=min(max_per_subject, len(df)), random_state=42)
+
+        df["subject"] = subject
+        df["category"] = _subject_to_category(subject)
+        records.append(df)
+
+    if not records:
+        raise RuntimeError(
+            "No MMLU subjects could be loaded. Run with Python that has internet access "
+            "to populate the HuggingFace cache first."
+        )
 
     combined = pd.concat(records, ignore_index=True)
 

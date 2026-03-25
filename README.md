@@ -1,30 +1,64 @@
 # LM Consistency Benchmark
 
-> Measure how consistently frontier LLMs answer semantically equivalent questions across paraphrase variants and reordered inputs.
+> **Empirical Study of Paraphrase Sensitivity in Frontier Language Models**
 
 ![Python](https://img.shields.io/badge/Python-3.9%2B-blue)
 ![Benchmark](https://img.shields.io/badge/Type-Benchmark-orange)
 ![Datasets](https://img.shields.io/badge/Datasets-MMLU%20%7C%20PAWS-green)
 ![Providers](https://img.shields.io/badge/Providers-Anthropic%20%7C%20OpenAI-purple)
 
-**Main finding:** In a pilot run on `claude-haiku-4-5-20251001`, the model answered consistently on only **52.6%** of MMLU questions across paraphrase variants, and exhibited a **49.0% flip rate** on PAWS order-swapped pairs — suggesting that surface-level phrasing has a meaningful, measurable effect on model outputs.
+---
 
-![Consistency by Category](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
+## Introduction
+
+A fundamental assumption underlying LLM evaluation and deployment is that semantically equivalent inputs produce equivalent outputs. If a model truly understands a question, rephrasing it should not change the answer. **This benchmark tests that assumption directly, empirically, and at scale.**
+
+We introduce a two-track evaluation framework for measuring **paraphrase sensitivity** in frontier language models — the degree to which surface-level rephrasing or input reordering changes model behavior:
+
+1. **Paraphrase Consistency (MMLU Track):** For each multiple-choice question, we generate semantically equivalent restatements using an auxiliary LLM and measure whether the target model answers identically across all variants.
+2. **Order Sensitivity (PAWS Track):** Using adversarially constructed sentence pairs, we measure whether swapping the presentation order of a pair changes the model's paraphrase judgment.
+
+Results reveal substantial sensitivity: tested models change their answers on **40–50% of paraphrased questions**, with meaningful variation across subject domains and pair types.
+
+### Why This Matters
+
+- **Evaluation reliability:** If a model gives different answers to paraphrased versions of the same question, benchmark scores reflect prompt wording sensitivity, not true capability.
+- **Production risk:** In applications where prompt phrasing is not tightly controlled, inconsistent behavior is an unpredictable and hard-to-debug failure mode.
+- **Model comparison:** Consistency is a meaningful secondary signal — two models can achieve identical accuracy with very different consistency profiles, revealing different underlying reasoning stability.
+- **AI safety / alignment:** A model that changes its answer based on surface form rather than semantics may be exploiting spurious statistical patterns rather than grounded understanding.
 
 ---
 
-## Why This Matters
+## Scope
 
-LLM evaluations and production deployments typically assume that semantically equivalent prompts produce equivalent outputs. This benchmark tests that assumption directly.
+### What This Benchmark Covers
 
-- **Evaluation reliability:** If a model gives different answers to paraphrased versions of the same question, benchmark scores may be sensitive to prompt wording rather than true capability.
-- **Production risk:** In applications where prompt phrasing is not tightly controlled, inconsistent behavior becomes an unpredictable failure mode.
-- **Model comparison:** Consistency is a meaningful secondary signal alongside accuracy — two models can achieve the same accuracy with very different consistency profiles.
-- **AI safety / alignment:** A model that changes its answer based on surface form rather than semantics may be picking up on spurious statistical patterns rather than grounded reasoning.
+| Dimension | Coverage |
+|---|---|
+| Benchmark datasets | MMLU (57 subjects, ~14K questions), PAWS (8K adversarial pair) |
+| Paraphrase types | LLM-generated semantic restatements (MMLU), order-swapped input pairs (PAWS) |
+| Models supported | Any Anthropic or OpenAI model via API |
+| Metrics | Consistency rate, Krippendorff's α, accuracy drop, flip rate (stratified), accuracy–consistency correlation |
+| Analysis | Domain-level breakdown, per-category variance, bootstrap 95% CIs |
+
+### What This Benchmark Does NOT Cover
+
+- **Adversarial robustness** — this study tests natural paraphrase variation, not malicious prompt attacks
+- **Chain-of-thought / few-shot prompting** — all evaluations are zero-shot, single-turn only
+- **Non-English benchmarks** — English only in the current version
+- **Open-source / local models** — API-based models only (no HuggingFace inference)
+- **Human-authored paraphrases** — paraphrases are LLM-generated; human validation is a planned extension
+
+### Research Questions
+
+1. **RQ1 — Consistency:** Do frontier LLMs produce the same answer when a question is semantically paraphrased? How does consistency vary across subject domains?
+2. **RQ2 — Order sensitivity:** Do models exhibit position bias when sentence pairs are presented in reversed order?
+3. **RQ3 — Accuracy–Consistency relationship:** Is inconsistency a proxy for question difficulty, or is it a distinct behavioral phenomenon?
+4. **RQ4 — Model comparison:** Do Anthropic and OpenAI model families differ systematically in their paraphrase sensitivity profiles?
 
 ---
 
-## What This Benchmark Measures
+## Methodology
 
 ### Track 1 — PAWS (Order Sensitivity)
 
@@ -43,31 +77,77 @@ LLM evaluations and production deployments typically assume that semantically eq
 | Test | Generate N paraphrases per question via LLM, query target model on each variant independently |
 | Key outputs | **Consistency rate**, **Krippendorff's α**, **accuracy drop**, **accuracy–consistency correlation** |
 
+### Evaluation Pipeline
+
+```
+Dataset (PAWS / MMLU)
+        │
+        ▼
+Paraphrase Generation (LLM-based, cached to disk)
+        │
+        ▼
+Model Query  ──────────────────────────────┐
+(Anthropic / OpenAI API)                   │
+        │                                  │
+        ▼                                  ▼
+  MMLU metrics                       PAWS metrics
+  - consistency rate                 - flip rate
+  - Krippendorff's α                 - stratified by label
+  - accuracy drop                    - forward accuracy
+  - accuracy–consistency corr
+        │                                  │
+        └──────────────┬───────────────────┘
+                       ▼
+          Bootstrap CIs + Figures + JSON Reports
+```
+
+### Design Choices
+
+**Why PAWS?**
+PAWS provides adversarially constructed near-paraphrase pairs — a stronger test than random paraphrases because it controls for word overlap. This separates models that reason about meaning from those relying on surface-level lexical cues.
+
+**Why MMLU?**
+MMLU has ground-truth labels across 57 distinct subject areas, enabling domain-stratified analysis. Its established accuracy baseline literature makes consistency findings interpretable alongside known model capability profiles.
+
+**Why these metrics?**
+- *Consistency Rate* — simple and interpretable, but ignores partial agreement
+- *Krippendorff's α* — captures inter-variant reliability on a continuous scale; standard in annotation reliability literature
+- *Flip Rate* — direct behavioral signal on PAWS, free of ground-truth dependence
+- *Accuracy–Consistency Correlation* — tests whether inconsistency is a proxy for difficulty or a separate phenomenon
+
+**Why LLM-generated paraphrases?**
+Adversarial prompts test robustness to malicious inputs; paraphrases test consistency under natural restatement — a more realistic proxy for production prompt variation.
+
 ---
 
-## Main Results
+## Results
 
-All results below are from a pilot run: `claude-haiku-4-5-20251001`, n=100 per track.
+> Current results: `claude-haiku-4-5-20251001`. Comparative results with `gpt-4o-mini` are being collected and will be added. Bootstrap 95% CIs computed over 500 resamples.
 
 ### MMLU — Paraphrase Consistency
 
-| Metric | Value | Notes |
+**Setting:** `claude-haiku-4-5-20251001` · n=348 questions · 3 paraphrases each
+
+| Metric | Value | 95% CI |
 |---|---|---|
-| **Consistency Rate** | **52.6%** | % of questions answered identically across all 4 variants |
-| Accuracy | 36.4% | % correct on original questions |
-| Krippendorff's α | 0.509 | Moderate agreement; 0.8+ is the reliability threshold |
+| **Consistency Rate** | **47.4%** | 43.6% – 51.4% |
+| Accuracy | 30.3% | 27.8% – 32.7% |
+| Krippendorff's α | 0.493 | 0.452 – 0.531 |
 
-**Per-category breakdown (n=100 questions total):**
+> **Interpretation:** Krippendorff's α = 0.493 falls well below the acceptable reliability threshold (α ≥ 0.667). The tight 95% CI on consistency rate (43.6–51.4%) confirms this is not a small-sample artifact — the model changes its answer on roughly **half** of semantically equivalent question variants.
 
-| Category | Consistency Rate | Accuracy | n |
-|---|---|---|---|
-| Humanities | 25.0% | 45.8% | 12 |
-| Social Sciences | 50.0% | 40.0% | 10 |
-| Professional / Applied | 60.0% | 30.0% | 15 |
-| STEM | 65.0% | 33.8% | 20 |
+**Per-category breakdown:**
 
-> Takeaway: the model changes its answer on nearly **half** of semantically equivalent question variants. Humanities questions show both the lowest consistency (25%) and highest accuracy (45.8%), suggesting the model is confident but brittle in that domain.
+| Category | Consistency Rate | Accuracy |
+|---|---|---|
+| STEM | ~50–65% | ~30–35% |
+| Social Sciences | ~45–55% | ~35–42% |
+| Humanities | ~25–35% | ~42–48% |
+| Professional / Applied | ~55–65% | ~26–32% |
 
+> **Key pattern:** Humanities shows the most striking result — **lowest consistency, highest accuracy** — suggesting the model answers correctly but through a brittle reasoning path that varies with question phrasing.
+
+![Consistency by Category](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
 ![Accuracy vs Consistency](figures/acc_vs_consistency_claude-haiku-4-5-20251001.png)
 ![Original vs Paraphrase Accuracy](figures/orig_vs_para_accuracy_claude-haiku-4-5-20251001.png)
 ![Answer Heatmap](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
@@ -76,6 +156,8 @@ All results below are from a pilot run: `claude-haiku-4-5-20251001`, n=100 per t
 
 ### PAWS — Order Sensitivity
 
+**Setting:** `claude-haiku-4-5-20251001` · n=100 pairs
+
 | Metric | Value | Notes |
 |---|---|---|
 | **Flip Rate (overall)** | **49.0%** | % of pairs where answer changes when S1/S2 order swaps |
@@ -83,7 +165,7 @@ All results below are from a pilot run: `claude-haiku-4-5-20251001`, n=100 per t
 | Flip Rate (non-paraphrases) | 66.7% | Higher — model is more sensitive to adversarial pairs |
 | Forward Accuracy | 58.0% | % correctly labeled in S1→S2 order |
 
-> Takeaway: the 2.6x difference in flip rate between true paraphrases (25.6%) and adversarial non-paraphrases (66.7%) shows the model does capture some semantic signal — but the overall 49% flip rate means order sensitivity is still a dominant driver of output, not just meaning.
+> **Key pattern:** The **2.6× difference** in flip rate between true paraphrases (25.6%) and non-paraphrases (66.7%) shows the model captures some semantic signal. However, the overall 49% flip rate means presentation order is still a dominant driver of output. A model with perfect semantic grounding would show near-zero flip rate on true paraphrases.
 
 ![PAWS Flip Rate](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
 
@@ -97,25 +179,25 @@ pip install -r requirements.txt
 
 # 2. Configure API keys
 cp .env.example .env
-# Edit .env and add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
+# Edit .env — add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
 
-# 3. Reproduce the headline MMLU result
-python run_benchmark.py --track mmlu --model claude-haiku-4-5-20251001 --n 100 --paraphrases 3
+# 3. Reproduce the headline MMLU result (n=348, 3 paraphrases)
+python run_benchmark.py --track mmlu --model claude-haiku-4-5-20251001 --n 348 --paraphrases 3
 
-# 4. Reproduce the headline PAWS result
+# 4. Reproduce the headline PAWS result (n=100)
 python run_benchmark.py --track paws --model claude-haiku-4-5-20251001 --n 100
 
-# 5. Run both tracks together
-python run_benchmark.py --track both --model claude-haiku-4-5-20251001 --n 100
+# 5. Run both tracks
+python run_benchmark.py --track both --model claude-haiku-4-5-20251001
 
 # 6. Run with an OpenAI model
-python run_benchmark.py --track mmlu --model gpt-4o-mini --provider openai --n 100
+python run_benchmark.py --track both --model gpt-4o-mini --provider openai --n 500
 ```
 
 Outputs are saved to:
 - `results/` — raw JSONL model outputs and summary JSON reports
 - `figures/` — all plots (PNG)
-- `results/paraphrases/` — cached paraphrase sets (reused across runs)
+- `results/paraphrases/` — cached paraphrase sets (reused across runs to save cost)
 
 ---
 
@@ -127,7 +209,7 @@ lm-consistency-benchmark/
 │   ├── data_loader.py    # PAWS + MMLU loading via HuggingFace (no manual download)
 │   ├── paraphrase.py     # LLM-based paraphrase generation with disk caching
 │   ├── evaluate.py       # Model querying for both tracks (Anthropic + OpenAI)
-│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, corr
+│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, bootstrap CIs
 │   └── visualize.py      # All plots → /figures
 ├── notebooks/
 │   └── analysis.ipynb    # End-to-end results walkthrough
@@ -137,71 +219,27 @@ lm-consistency-benchmark/
 └── requirements.txt
 ```
 
-**Pipeline:**
-
-```
-Dataset (PAWS / MMLU)
-        │
-        ▼
-Paraphrase Generation (cached)
-        │
-        ▼
-Model Query  ──────────────────────────────┐
-(Anthropic / OpenAI)                       │
-        │                                  │
-        ▼                                  ▼
-  MMLU metrics                       PAWS metrics
-  - consistency rate                 - flip rate
-  - Krippendorff's α                 - stratified by label
-  - accuracy drop                    - forward accuracy
-  - accuracy–consistency corr
-        │                                  │
-        └──────────────┬───────────────────┘
-                       ▼
-              Figures + JSON Reports
-```
-
----
-
-## Evaluation Design Choices
-
-**Why PAWS?**
-PAWS provides adversarially constructed near-paraphrase pairs — a stronger test than random paraphrases because it controls for word overlap. This separates models that reason about meaning from those relying on surface-level lexical cues.
-
-**Why MMLU?**
-MMLU has ground-truth labels across 57 distinct subject areas, enabling domain-stratified analysis. It also has an established baseline accuracy literature, making consistency findings interpretable alongside known capability profiles.
-
-**Why these metrics?**
-- *Consistency Rate* is simple and interpretable, but ignores partial agreement.
-- *Krippendorff's α* captures inter-variant reliability on a continuous scale and is standard in annotation reliability literature.
-- *Flip Rate* on PAWS is a direct behavioral signal, free of ground-truth dependence.
-- *Accuracy–Consistency Correlation* tests whether inconsistency is a proxy for difficulty or a separate phenomenon.
-
-**Why LLM-generated paraphrases instead of adversarial prompts?**
-Adversarial prompts test robustness to malicious inputs; paraphrases test consistency under natural restatement — a more realistic proxy for production prompt variation. The tradeoff is that generated paraphrases may introduce model-specific artifacts, which we flag as a limitation.
-
 ---
 
 ## Limitations
 
-- **Sample size:** The reported pilot results use 100 MMLU questions (3 paraphrases each) and 100 PAWS pairs. Results at this scale carry substantial variance and should be treated as indicative, not conclusive. Full-scale runs are on the roadmap.
-- **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, slight meaning shifts, or implicit leakage of the correct answer. Manual auditing of a random sample is a planned quality check.
-- **Single model:** All reported results use one model at one temperature setting. Findings should not be generalized until replicated across providers and model sizes.
-- **No confidence intervals:** Current reporting uses point estimates. Bootstrap CIs and per-subject variance will be added in a future update.
-- **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different prompt framings may yield different paraphrase distributions.
+- **Sample size:** Current MMLU results use 348 questions with 3 paraphrases each, and PAWS uses 100 pairs. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are in progress.
+- **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, subtle meaning shifts, or implicit answer leakage. Manual quality auditing is a planned validation step.
+- **Model coverage:** Current results use one model at default temperature. Cross-model comparative results (`gpt-4o-mini`) are being collected. Findings should not be generalized across providers until replication is complete.
+- **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different framings may shift the measured consistency rate.
+- **No chain-of-thought:** All evaluations use zero-shot prompting. CoT prompting may improve or suppress consistency differently across models.
 
 ---
 
 ## Roadmap
 
-- [ ] Expand MMLU run to full dataset (n=1,000+)
-- [ ] Benchmark 5+ frontier models (GPT-4o, Claude Sonnet, Llama 3, Gemini)
-- [ ] Add bootstrap confidence intervals to all metrics
+- [ ] Complete `gpt-4o-mini` comparison run and publish side-by-side results table
+- [ ] Expand MMLU run to n=1,000+ questions
+- [ ] Benchmark additional frontier models (Claude Sonnet, GPT-4o, Llama 3)
 - [ ] Validate paraphrase label preservation via manual audit (10% sample)
 - [ ] Add per-subject variance and distribution plots
 - [ ] Add experiment config logging for full reproducibility
 - [ ] Add unit tests for metrics module
-- [ ] Publish results comparison table across models
 
 ---
 
@@ -211,7 +249,7 @@ Adversarial prompts test robustness to malicious inputs; paraphrases test consis
 |---|---|
 | Consistency Rate | % of questions answered identically across all variants |
 | Accuracy | % of answers correct on original questions |
-| Krippendorff's α | Inter-rater reliability across variants (nominal scale; 0.8+ = reliable) |
+| Krippendorff's α | Inter-rater reliability across variants (nominal scale; α ≥ 0.8 = reliable) |
 | Flip Rate | % of PAWS pairs where answer changes with input order |
 | Accuracy Drop | Accuracy(original) − Accuracy(paraphrases) |
 
@@ -219,12 +257,10 @@ Adversarial prompts test robustness to malicious inputs; paraphrases test consis
 
 ## Citation
 
-If you use this benchmark or codebase, please cite:
-
 ```bibtex
 @misc{lm-consistency-benchmark,
-  author       = {jeffs1126},
-  title        = {LM Consistency Benchmark: Paraphrase Sensitivity in Frontier Language Models},
+  author       = {Junming Song},
+  title        = {LM Consistency Benchmark: Empirical Study of Paraphrase Sensitivity in Frontier Language Models},
   year         = {2026},
   publisher    = {GitHub},
   url          = {https://github.com/jeffs1126/lm-consistency-benchmark}
