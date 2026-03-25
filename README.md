@@ -120,6 +120,26 @@ Adversarial prompts test robustness to malicious inputs; paraphrases test consis
 
 ---
 
+## Project Structure
+
+```
+lm-consistency-benchmark/
+├── src/
+│   ├── data_loader.py    # PAWS + MMLU loading via HuggingFace (no manual download)
+│   ├── paraphrase.py     # LLM-based paraphrase generation with disk caching
+│   ├── evaluate.py       # Model querying for both tracks (Anthropic + OpenAI)
+│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, bootstrap CIs
+│   └── visualize.py      # All plots → /figures
+├── notebooks/
+│   └── analysis.ipynb    # End-to-end results walkthrough
+├── results/              # Cached model outputs + summary reports
+├── figures/              # Generated plots
+├── run_benchmark.py      # CLI entry point
+└── requirements.txt
+```
+
+---
+
 ## Results
 
 > All results use n=456–500 samples per track. Bootstrap 95% CIs computed over 500 resamples.
@@ -228,31 +248,11 @@ Outputs are saved to:
 
 ---
 
-## Project Structure
-
-```
-lm-consistency-benchmark/
-├── src/
-│   ├── data_loader.py    # PAWS + MMLU loading via HuggingFace (no manual download)
-│   ├── paraphrase.py     # LLM-based paraphrase generation with disk caching
-│   ├── evaluate.py       # Model querying for both tracks (Anthropic + OpenAI)
-│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, bootstrap CIs
-│   └── visualize.py      # All plots → /figures
-├── notebooks/
-│   └── analysis.ipynb    # End-to-end results walkthrough
-├── results/              # Cached model outputs + summary reports
-├── figures/              # Generated plots
-├── run_benchmark.py      # CLI entry point
-└── requirements.txt
-```
-
----
-
 ## Limitations
 
 - **Sample size:** Current MMLU results use 348 questions with 3 paraphrases each, and PAWS uses 100 pairs. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are in progress.
 - **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, subtle meaning shifts, or implicit answer leakage. Manual quality auditing is a planned validation step.
-- **Model coverage:** Current results use one model at default temperature. Cross-model comparative results (`gpt-4o-mini`) are being collected. Findings should not be generalized across providers until replication is complete.
+- **Model coverage:** Current results cover two models (`claude-haiku-4-5-20251001` and `gpt-4o-mini`) at default temperature. Findings should not be generalized until replicated across more providers and model sizes.
 - **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different framings may shift the measured consistency rate.
 - **No chain-of-thought:** All evaluations use zero-shot prompting. CoT prompting may improve or suppress consistency differently across models.
 
@@ -260,7 +260,7 @@ lm-consistency-benchmark/
 
 ## Roadmap
 
-- [ ] Complete `gpt-4o-mini` comparison run and publish side-by-side results table
+- [x] Complete `gpt-4o-mini` comparison run and publish side-by-side results table
 - [ ] Expand MMLU run to n=1,000+ questions
 - [ ] Benchmark additional frontier models (Claude Sonnet, GPT-4o, Llama 3)
 - [ ] Validate paraphrase label preservation via manual audit (10% sample)
