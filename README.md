@@ -18,7 +18,7 @@ We introduce a two-track evaluation framework for measuring **paraphrase sensiti
 1. **Paraphrase Consistency (MMLU Track):** For each multiple-choice question, we generate semantically equivalent restatements using an auxiliary LLM and measure whether the target model answers identically across all variants.
 2. **Order Sensitivity (PAWS Track):** Using adversarially constructed sentence pairs, we measure whether swapping the presentation order of a pair changes the model's paraphrase judgment.
 
-Results reveal substantial sensitivity: tested models change their answers on **40–50% of paraphrased questions**, with meaningful variation across subject domains and pair types.
+Results reveal substantial sensitivity: at n=500, tested models change their answers on **~47% of paraphrased MMLU questions** and exhibit a **41% flip rate on PAWS order-swapped pairs**, with meaningful variation across subject domains and pair types.
 
 ### Why This Matters
 
@@ -156,16 +156,16 @@ Adversarial prompts test robustness to malicious inputs; paraphrases test consis
 
 ### PAWS — Order Sensitivity
 
-**Setting:** `claude-haiku-4-5-20251001` · n=100 pairs
+**Setting:** `claude-haiku-4-5-20251001` · n=500 pairs
 
-| Metric | Value | Notes |
+| Metric | Value | 95% CI |
 |---|---|---|
-| **Flip Rate (overall)** | **49.0%** | % of pairs where answer changes when S1/S2 order swaps |
-| Flip Rate (true paraphrases) | 25.6% | Lower — model partially tracks semantic equivalence |
-| Flip Rate (non-paraphrases) | 66.7% | Higher — model is more sensitive to adversarial pairs |
-| Forward Accuracy | 58.0% | % correctly labeled in S1→S2 order |
+| **Flip Rate (overall)** | **41.4%** | 37.2% – 45.6% |
+| Flip Rate (true paraphrases) | 23.9% | — |
+| Flip Rate (non-paraphrases) | 55.4% | — |
+| Forward Accuracy | 60.0% | — |
 
-> **Key pattern:** The **2.6× difference** in flip rate between true paraphrases (25.6%) and non-paraphrases (66.7%) shows the model captures some semantic signal. However, the overall 49% flip rate means presentation order is still a dominant driver of output. A model with perfect semantic grounding would show near-zero flip rate on true paraphrases.
+> **Key pattern:** The **2.3× difference** in flip rate between true paraphrases (23.9%) and non-paraphrases (55.4%) confirms the model captures genuine semantic signal. The overall 41.4% flip rate (95% CI: 37.2–45.6%) is substantially above chance (50% would be random), confirming a real but incomplete sensitivity to input ordering. The pilot n=100 estimate of 49% was inflated; n=500 stabilizes near 41%.
 
 ![PAWS Flip Rate](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
 
