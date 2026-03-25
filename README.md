@@ -24,7 +24,47 @@ For each MMLU multiple-choice question, we generate N semantically equivalent pa
 
 ## Key Findings
 
-*(Populated after running the benchmark)*
+All results are for `claude-haiku-4-5-20251001`.
+
+### MMLU Track (n=100 questions, 3 paraphrases each)
+
+| Metric | Value |
+|---|---|
+| Consistency Rate | 52.6% |
+| Accuracy | 36.4% |
+| Krippendorff's α | 0.509 |
+
+**Consistency by category:**
+
+| Category | Consistency Rate | Accuracy | n |
+|---|---|---|---|
+| Humanities | 25.0% | 45.8% | 12 |
+| Social Sciences | 50.0% | 40.0% | 10 |
+| Professional / Applied | 60.0% | 30.0% | 15 |
+| STEM | 65.0% | 33.8% | 20 |
+
+![Consistency by Category](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
+
+![Accuracy vs Consistency](figures/acc_vs_consistency_claude-haiku-4-5-20251001.png)
+
+![Original vs Paraphrase Accuracy](figures/orig_vs_para_accuracy_claude-haiku-4-5-20251001.png)
+
+![Answer Heatmap](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
+
+### PAWS Track (n=100 pairs)
+
+| Metric | Value |
+|---|---|
+| Flip Rate (overall) | 49.0% |
+| Flip Rate (true paraphrases) | 25.6% |
+| Flip Rate (non-paraphrases) | 66.7% |
+| Forward Accuracy | 58.0% |
+
+![PAWS Flip Rate](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
+
+### Interpretation
+
+The model is consistent on only about half of questions (52.6%), meaning that for nearly half the benchmark, rephrasing the same question changes the model's answer. A Krippendorff's α of 0.509 indicates only moderate inter-variant agreement — well below the 0.8 threshold typically associated with reliable annotation — signaling that surface-level phrasing has a meaningful influence on model outputs. The PAWS results reveal an important asymmetry: the model flips its paraphrase judgment on 25.6% of true paraphrases but on 66.7% of adversarial non-paraphrases, suggesting the model does capture some semantic signal but remains highly sensitive to superficial lexical and syntactic variation. Taken together, these findings raise concerns for high-stakes deployment contexts where prompt wording may not be controlled.
 
 ## Quickstart
 
