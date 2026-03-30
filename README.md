@@ -20,7 +20,9 @@ We introduce a two-track evaluation framework for measuring **paraphrase sensiti
 
 Results reveal substantial and model-dependent sensitivity: Claude Haiku changes its answer on **~47% of paraphrased MMLU questions** (Krippendorff's α = 0.493, below reliability threshold), while GPT-4o-mini achieves **77.9% consistency** (α = 0.835, crossing the reliability threshold). On PAWS, Claude Haiku flips 41.4% of pairs vs. 16.0% for GPT-4o-mini — yet the two models show qualitatively different sensitivity profiles that reveal distinct reasoning behaviors.
 
-### Why This Matters
+---
+
+## Why This Matters
 
 - **Evaluation reliability:** If a model gives different answers to paraphrased versions of the same question, benchmark scores reflect prompt wording sensitivity, not true capability.
 - **Production risk:** In applications where prompt phrasing is not tightly controlled, inconsistent behavior is an unpredictable and hard-to-debug failure mode.
@@ -35,7 +37,7 @@ Results reveal substantial and model-dependent sensitivity: Claude Haiku changes
 
 | Dimension | Coverage |
 |---|---|
-| Benchmark datasets | MMLU (57 subjects, ~14K questions), PAWS (8K adversarial pair) |
+| Benchmark datasets | MMLU (57 subjects, ~14K questions), PAWS (8K adversarial pairs) |
 | Paraphrase types | LLM-generated semantic restatements (MMLU), order-swapped input pairs (PAWS) |
 | Models supported | Any Anthropic or OpenAI model via API |
 | Metrics | Consistency rate, Krippendorff's α, accuracy drop, flip rate (stratified), accuracy–consistency correlation |
@@ -58,7 +60,7 @@ Results reveal substantial and model-dependent sensitivity: Claude Haiku changes
 
 ---
 
-## Methodology
+## Methodology / Evaluation Framework
 
 ### Track 1 — PAWS (Order Sensitivity)
 
@@ -109,40 +111,51 @@ PAWS provides adversarially constructed near-paraphrase pairs — a stronger tes
 **Why MMLU?**
 MMLU has ground-truth labels across 57 distinct subject areas, enabling domain-stratified analysis. Its established accuracy baseline literature makes consistency findings interpretable alongside known model capability profiles.
 
-**Why these metrics?**
-- *Consistency Rate* — simple and interpretable, but ignores partial agreement
-- *Krippendorff's α* — captures inter-variant reliability on a continuous scale; standard in annotation reliability literature
-- *Flip Rate* — direct behavioral signal on PAWS, free of ground-truth dependence
-- *Accuracy–Consistency Correlation* — tests whether inconsistency is a proxy for difficulty or a separate phenomenon
-
 **Why LLM-generated paraphrases?**
 Adversarial prompts test robustness to malicious inputs; paraphrases test consistency under natural restatement — a more realistic proxy for production prompt variation.
 
 ---
 
-## Project Structure
+## Datasets
 
-```
-lm-consistency-benchmark/
-├── src/
-│   ├── data_loader.py    # PAWS + MMLU loading via HuggingFace (no manual download)
-│   ├── paraphrase.py     # LLM-based paraphrase generation with disk caching
-│   ├── evaluate.py       # Model querying for both tracks (Anthropic + OpenAI)
-│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, bootstrap CIs
-│   └── visualize.py      # All plots → /figures
-├── notebooks/
-│   └── analysis.ipynb    # End-to-end results walkthrough
-├── results/              # Cached model outputs + summary reports
-├── figures/              # Generated plots
-├── run_benchmark.py      # CLI entry point
-└── requirements.txt
-```
+| Dataset | Source | Size | Use |
+|---|---|---|---|
+| [PAWS](https://huggingface.co/datasets/google-research-datasets/paws) | Zhang et al., Google Research | 8K labeled sentence pairs | Order-sensitivity track |
+| [MMLU](https://huggingface.co/datasets/cais/mmlu) | Hendrycks et al., CAIS | ~14K questions across 57 subjects | Paraphrase consistency track |
+
+Both datasets are loaded directly via the HuggingFace `datasets` library — no manual download required.
+
+---
+
+## Models Evaluated
+
+| Model | Provider | Track | n (MMLU) | n (PAWS) |
+|---|---|---|---|---|
+| `claude-haiku-4-5-20251001` | Anthropic | Both | 348 questions | 500 pairs |
+| `gpt-4o-mini` | OpenAI | Both | 456 questions | 500 pairs |
+
+All evaluations use **temperature=0** (deterministic decoding, default). MMLU sample sizes differ because some MMLU subjects failed to load due to a schema incompatibility in the HuggingFace dataset version used; results are unaffected by the drop.
+
+The benchmark CLI supports any Anthropic or OpenAI model — see [Reproducibility](#reproducibility--project-structure) for usage.
+
+---
+
+## Metrics
+
+| Metric | Description | Threshold |
+|---|---|---|
+| **Consistency Rate** | % of questions answered identically across all variants | Higher is better |
+| **Accuracy** | % of answers correct on original questions | Higher is better |
+| **Krippendorff's α** | Inter-rater reliability across variants (nominal scale) | α ≥ 0.8 = reliable |
+| **Flip Rate** | % of PAWS pairs where answer changes with input order | Lower is better |
+| **Accuracy Drop** | Accuracy(original) − Accuracy(paraphrases) | Lower is better |
+| **Accuracy–Consistency r** | Pearson correlation between per-question accuracy and consistency | Separates difficulty from stability |
 
 ---
 
 ## Results
 
-> **Sample sizes:** MMLU — 348 questions (Claude Haiku), 456 questions (GPT-4o-mini); 500 requested per model, some subjects failed to load due to schema incompatibility in the HuggingFace dataset version. PAWS — 500 pairs per model. All evaluations use temperature=0 (default). Bootstrap 95% CIs computed over 500 resamples.
+> **Sample sizes:** MMLU — 348 questions (Claude Haiku), 456 questions (GPT-4o-mini); PAWS — 500 pairs per model. All evaluations use temperature=0 (default). Bootstrap 95% CIs computed over 500 resamples.
 
 ### Model Comparison Summary
 
@@ -163,27 +176,9 @@ lm-consistency-benchmark/
 | Flip Rate (non-paraphrases) | 55.4% | 17.3% | −38.1pp |
 | Forward Accuracy | 60.0% | 78.6% | +18.6pp |
 
----
-
-### Key Findings
-
-**Finding 1 — Large consistency gap between models.**
-GPT-4o-mini achieves 77.9% consistency vs. 47.4% for Claude Haiku on MMLU — a 30.5 percentage point gap. GPT-4o-mini's Krippendorff's α = 0.835 crosses the reliability threshold (α ≥ 0.8); Claude Haiku's α = 0.493 falls well below acceptable reliability.
-
-**Finding 2 — PAWS reveals qualitatively different sensitivity profiles.**
-Claude Haiku shows a **2.3× difference** in flip rate between true paraphrases (23.9%) and non-paraphrases (55.4%), indicating it picks up genuine semantic signal but remains highly order-sensitive. GPT-4o-mini shows nearly identical flip rates across both classes (14.4% vs 17.3%, **1.2× ratio**) — suggesting it is anchored to its initial classification regardless of pair type, not that it reasons about meaning more carefully.
-
-**Finding 3 — Accuracy–Consistency are correlated but distinct.**
-The Pearson correlation between per-question accuracy and consistency is r=0.40 (p<1e-18) for GPT-4o-mini — harder questions are less consistent, but the relationship is moderate, not deterministic. Inconsistency is not simply a proxy for difficulty.
-
-**Finding 4 — Humanities is the most brittle domain for both models.**
-Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its highest accuracy (~42–48%) in that domain — a confidence-without-stability pattern. GPT-4o-mini is more consistent across all domains but shows the smallest consistency advantage in STEM (70.0% vs ~50–65%).
-
----
-
 ### Detailed Results — Claude Haiku
 
-**MMLU per-category:**
+**MMLU per-category (n=348):**
 
 | Category | Consistency Rate | Accuracy | n |
 |---|---|---|---|
@@ -198,19 +193,9 @@ Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its 
 ![Answer Heatmap (Haiku)](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
 ![PAWS Flip Rate (Haiku)](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
 
-**PAWS comparison across models:**
-
-![PAWS Flip Rate Comparison](figures/paws_flip_rate_comparison.png)
-
-**MMLU per-category comparison across models:**
-
-![MMLU Category Comparison](figures/mmlu_category_comparison.png)
-
----
-
 ### Detailed Results — GPT-4o-mini
 
-**MMLU per-category:**
+**MMLU per-category (n=456):**
 
 | Category | Consistency Rate | Accuracy | n |
 |---|---|---|---|
@@ -225,9 +210,42 @@ Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its 
 ![Answer Heatmap (GPT-4o-mini)](figures/answer_heatmap_gpt-4o-mini.png)
 ![PAWS Flip Rate (GPT-4o-mini)](figures/paws_flip_rate_gpt-4o-mini.png)
 
+**Cross-model comparison:**
+
+![PAWS Flip Rate Comparison](figures/paws_flip_rate_comparison.png)
+![MMLU Category Comparison](figures/mmlu_category_comparison.png)
+
 ---
 
-## Reproduce the Results
+## Analysis
+
+**Finding 1 — Large consistency gap between models.**
+GPT-4o-mini achieves 77.9% consistency vs. 47.4% for Claude Haiku on MMLU — a 30.5 percentage point gap. GPT-4o-mini's Krippendorff's α = 0.835 crosses the reliability threshold (α ≥ 0.8); Claude Haiku's α = 0.493 falls well below acceptable reliability.
+
+**Finding 2 — PAWS reveals qualitatively different sensitivity profiles.**
+Claude Haiku shows a **2.3× difference** in flip rate between true paraphrases (23.9%) and non-paraphrases (55.4%), indicating it picks up genuine semantic signal but remains highly order-sensitive. GPT-4o-mini shows nearly identical flip rates across both classes (14.4% vs 17.3%, **1.2× ratio**) — suggesting it is anchored to its initial classification regardless of pair type.
+
+**Finding 3 — Accuracy and consistency are correlated but distinct.**
+The Pearson correlation between per-question accuracy and consistency is r=0.40 (p<1e-18) for GPT-4o-mini — harder questions are less consistent, but the relationship is moderate, not deterministic. Inconsistency is not simply a proxy for difficulty.
+
+**Finding 4 — Social Sciences is the most brittle domain for Claude Haiku.**
+Claude Haiku's lowest consistency is in Social Sciences (33.9%), yet accuracy there (33.0%) is comparable to other domains — indicating instability independent of capability. GPT-4o-mini shows its strongest consistency in Social Sciences (88.8%), the inverse pattern.
+
+---
+
+## Limitations
+
+- **Sample size:** MMLU uses 348 questions (Claude Haiku) and 456 questions (GPT-4o-mini) with 3 paraphrases each; PAWS uses 500 pairs per model. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are planned.
+- **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, subtle meaning shifts, or implicit answer leakage. Manual quality auditing is a planned validation step.
+- **Model coverage:** Current results cover two models at default temperature. Findings should not be generalized until replicated across more providers and model sizes.
+- **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different framings may shift the measured consistency rate.
+- **No chain-of-thought:** All evaluations use zero-shot prompting. CoT prompting may improve or suppress consistency differently across models.
+
+---
+
+## Reproducibility / Project Structure
+
+### Setup
 
 ```bash
 # 1. Install dependencies
@@ -236,17 +254,18 @@ pip install -r requirements.txt
 # 2. Configure API keys
 cp .env.example .env
 # Edit .env — add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
+```
 
-# 3. Reproduce the headline MMLU result (n=500, 3 paraphrases, temperature=0 default)
+### Reproduce the Results
+
+```bash
+# Reproduce Claude Haiku MMLU result (n=500, 3 paraphrases, temperature=0)
 python run_benchmark.py --track mmlu --model claude-haiku-4-5-20251001 --n 500 --paraphrases 3
 
-# 4. Reproduce the headline PAWS result (n=500)
+# Reproduce Claude Haiku PAWS result (n=500)
 python run_benchmark.py --track paws --model claude-haiku-4-5-20251001 --n 500
 
-# 5. Run both tracks
-python run_benchmark.py --track both --model claude-haiku-4-5-20251001
-
-# 6. Run with an OpenAI model
+# Run both tracks for GPT-4o-mini
 python run_benchmark.py --track both --model gpt-4o-mini --provider openai --n 500
 ```
 
@@ -255,15 +274,23 @@ Outputs are saved to:
 - `figures/` — all plots (PNG)
 - `results/paraphrases/` — cached paraphrase sets (reused across runs to save cost)
 
----
+### Project Structure
 
-## Limitations
-
-- **Sample size:** MMLU uses 348 questions (Claude Haiku) and 456 questions (GPT-4o-mini) with 3 paraphrases each; PAWS uses 500 pairs per model. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are planned.
-- **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, subtle meaning shifts, or implicit answer leakage. Manual quality auditing is a planned validation step.
-- **Model coverage:** Current results cover two models (`claude-haiku-4-5-20251001` and `gpt-4o-mini`) at default temperature. Findings should not be generalized until replicated across more providers and model sizes.
-- **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different framings may shift the measured consistency rate.
-- **No chain-of-thought:** All evaluations use zero-shot prompting. CoT prompting may improve or suppress consistency differently across models.
+```
+lm-consistency-benchmark/
+├── src/
+│   ├── data_loader.py    # PAWS + MMLU loading via HuggingFace (no manual download)
+│   ├── paraphrase.py     # LLM-based paraphrase generation with disk caching
+│   ├── evaluate.py       # Model querying for both tracks (Anthropic + OpenAI)
+│   ├── metrics.py        # Consistency rate, Krippendorff's α, flip rate, bootstrap CIs
+│   └── visualize.py      # All plots → /figures
+├── notebooks/
+│   └── analysis.ipynb    # End-to-end results walkthrough
+├── results/              # Cached model outputs + summary reports
+├── figures/              # Generated plots
+├── run_benchmark.py      # CLI entry point
+└── requirements.txt
+```
 
 ---
 
@@ -276,18 +303,6 @@ Outputs are saved to:
 - [ ] Add per-subject variance and distribution plots
 - [ ] Add experiment config logging for full reproducibility
 - [ ] Add unit tests for metrics module
-
----
-
-## Metrics Reference
-
-| Metric | Description |
-|---|---|
-| Consistency Rate | % of questions answered identically across all variants |
-| Accuracy | % of answers correct on original questions |
-| Krippendorff's α | Inter-rater reliability across variants (nominal scale; α ≥ 0.8 = reliable) |
-| Flip Rate | % of PAWS pairs where answer changes with input order |
-| Accuracy Drop | Accuracy(original) − Accuracy(paraphrases) |
 
 ---
 
@@ -304,11 +319,6 @@ Outputs are saved to:
 ```
 
 ---
-
-## Datasets Used
-
-- [PAWS](https://huggingface.co/datasets/google-research-datasets/paws) — Zhang et al., Google Research
-- [MMLU](https://huggingface.co/datasets/cais/mmlu) — Hendrycks et al., CAIS
 
 ## License
 
