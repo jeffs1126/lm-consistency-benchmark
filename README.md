@@ -55,8 +55,9 @@ Results reveal substantial and model-dependent sensitivity: Claude Haiku changes
 
 1. **RQ1 — Consistency:** Do frontier LLMs produce the same answer when a question is semantically paraphrased? How does consistency vary across subject domains?
 2. **RQ2 — Order sensitivity:** Do models exhibit position bias when sentence pairs are presented in reversed order?
-3. **RQ3 — Accuracy–Consistency relationship:** Is inconsistency a proxy for question difficulty, or is it a distinct behavioral phenomenon?
+3. **RQ3 — Difficulty stratification:** Is inconsistency a proxy for question difficulty, or a distinct behavioral phenomenon? Which subjects drive instability — and does stratifying by difficulty change which questions we prioritize for the n=1,000+ expansion?
 4. **RQ4 — Model comparison:** Do Anthropic and OpenAI model families differ systematically in their paraphrase sensitivity profiles?
+5. **RQ5 — Cross-track correlation:** Does order sensitivity (PAWS flip rate) predict paraphrase inconsistency (MMLU consistency rate) across models? If so, are PAWS and MMLU measuring two surface expressions of a single underlying stability trait?
 
 ---
 
@@ -231,6 +232,18 @@ The Pearson correlation between per-question accuracy and consistency is r=0.40 
 **Finding 4 — Social Sciences is the most brittle domain for Claude Haiku.**
 Claude Haiku's lowest consistency is in Social Sciences (33.9%), yet accuracy there (33.0%) is comparable to other domains — indicating instability independent of capability. GPT-4o-mini shows its strongest consistency in Social Sciences (88.8%), the inverse pattern.
 
+**Finding 5 — Order sensitivity and paraphrase consistency may reflect a single underlying behavioral dimension.**
+Across the two models tested, PAWS flip rate and MMLU consistency rate show a strong directional relationship:
+
+| Model | PAWS Flip Rate | MMLU Consistency Rate | Krippendorff's α |
+|---|---|---|---|
+| Claude Haiku | 41.4% | 47.4% | 0.493 |
+| GPT-4o-mini | 16.0% | 77.9% | 0.835 |
+
+The model with higher order sensitivity (Haiku) is also the model with lower paraphrase consistency — and vice versa. GPT-4o-mini occupies the "frontier" quadrant: high accuracy (74.6%) and high consistency (77.9%), suggesting that robustness to rephrasing may be a hallmark of frontier capability, not merely a side effect of model size. This pattern suggests PAWS and MMLU are not measuring two independent bugs but two surface expressions of a single underlying stability trait. However, a directional pattern across two models is not a statistical correlation — confirming this hypothesis requires replication across 5+ models of varying size and architecture, motivating RQ5 and the multi-model roadmap item.
+
+![Stability vs Accuracy](figures/stability_vs_accuracy.png)
+
 ---
 
 ## Limitations
@@ -297,10 +310,11 @@ lm-consistency-benchmark/
 ## Roadmap
 
 - [x] Complete `gpt-4o-mini` comparison run and publish side-by-side results table
-- [ ] Expand MMLU run to n=1,000+ questions
+- [ ] Add per-subject variance and distribution plots — stratify by difficulty to identify which subjects drive instability before scaling up
+- [ ] Expand MMLU run to n=1,000+ questions, prioritizing subjects identified as high-instability in difficulty stratification
+- [ ] Compute PAWS–MMLU cross-track correlation across 5+ models to test whether order sensitivity and paraphrase consistency reflect a single behavioral dimension (RQ5)
 - [ ] Benchmark additional frontier models (Claude Sonnet, GPT-4o, Llama 3)
 - [ ] Validate paraphrase label preservation via manual audit (10% sample)
-- [ ] Add per-subject variance and distribution plots
 - [ ] Add experiment config logging for full reproducibility
 - [ ] Add unit tests for metrics module
 
