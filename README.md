@@ -142,7 +142,7 @@ lm-consistency-benchmark/
 
 ## Results
 
-> All results use n=456–500 samples per track. Bootstrap 95% CIs computed over 500 resamples.
+> **Sample sizes:** MMLU — 348 questions (Claude Haiku), 456 questions (GPT-4o-mini); 500 requested per model, some subjects failed to load due to schema incompatibility in the HuggingFace dataset version. PAWS — 500 pairs per model. All evaluations use temperature=0 (default). Bootstrap 95% CIs computed over 500 resamples.
 
 ### Model Comparison Summary
 
@@ -187,16 +187,20 @@ Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its 
 
 | Category | Consistency Rate | Accuracy | n |
 |---|---|---|---|
-| STEM | — | — | 160 |
-| Humanities | — | — | 96 |
-| Social Sciences | — | — | 80 |
-| Professional / Applied | — | — | 120 |
+| STEM | 53.8% | 28.1% | 160 |
+| Humanities | 41.7% | 31.8% | 60 |
+| Social Sciences | 33.9% | 33.0% | 56 |
+| Professional / Applied | 48.6% | 31.9% | 72 |
 
 ![Consistency by Category (Haiku)](figures/consistency_by_category_claude-haiku-4-5-20251001.png)
 ![Accuracy vs Consistency (Haiku)](figures/acc_vs_consistency_claude-haiku-4-5-20251001.png)
 ![Original vs Paraphrase Accuracy (Haiku)](figures/orig_vs_para_accuracy_claude-haiku-4-5-20251001.png)
 ![Answer Heatmap (Haiku)](figures/answer_heatmap_claude-haiku-4-5-20251001.png)
 ![PAWS Flip Rate (Haiku)](figures/paws_flip_rate_claude-haiku-4-5-20251001.png)
+
+**PAWS comparison across models:**
+
+![PAWS Flip Rate Comparison](figures/paws_flip_rate_comparison.png)
 
 ---
 
@@ -228,11 +232,11 @@ pip install -r requirements.txt
 cp .env.example .env
 # Edit .env — add ANTHROPIC_API_KEY and/or OPENAI_API_KEY
 
-# 3. Reproduce the headline MMLU result (n=348, 3 paraphrases)
-python run_benchmark.py --track mmlu --model claude-haiku-4-5-20251001 --n 348 --paraphrases 3
+# 3. Reproduce the headline MMLU result (n=500, 3 paraphrases, temperature=0 default)
+python run_benchmark.py --track mmlu --model claude-haiku-4-5-20251001 --n 500 --paraphrases 3
 
-# 4. Reproduce the headline PAWS result (n=100)
-python run_benchmark.py --track paws --model claude-haiku-4-5-20251001 --n 100
+# 4. Reproduce the headline PAWS result (n=500)
+python run_benchmark.py --track paws --model claude-haiku-4-5-20251001 --n 500
 
 # 5. Run both tracks
 python run_benchmark.py --track both --model claude-haiku-4-5-20251001
@@ -250,7 +254,7 @@ Outputs are saved to:
 
 ## Limitations
 
-- **Sample size:** Current MMLU results use 348 questions with 3 paraphrases each, and PAWS uses 100 pairs. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are in progress.
+- **Sample size:** MMLU uses 348 questions (Claude Haiku) and 456 questions (GPT-4o-mini) with 3 paraphrases each; PAWS uses 500 pairs per model. Bootstrap CIs confirm headline findings are not noise artifacts, but domain-level breakdowns remain underpowered. Full-scale runs (n=1,000+) are planned.
 - **Paraphrase quality:** Paraphrases are LLM-generated and may introduce lexical artifacts, subtle meaning shifts, or implicit answer leakage. Manual quality auditing is a planned validation step.
 - **Model coverage:** Current results cover two models (`claude-haiku-4-5-20251001` and `gpt-4o-mini`) at default temperature. Findings should not be generalized until replicated across more providers and model sizes.
 - **Prompt sensitivity:** The paraphrase generation prompt and model query prompt are not ablated. Different framings may shift the measured consistency rate.
