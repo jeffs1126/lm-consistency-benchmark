@@ -202,6 +202,10 @@ Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its 
 
 ![PAWS Flip Rate Comparison](figures/paws_flip_rate_comparison.png)
 
+**MMLU per-category comparison across models:**
+
+![MMLU Category Comparison](figures/mmlu_category_comparison.png)
+
 ---
 
 ### Detailed Results — GPT-4o-mini
@@ -219,6 +223,7 @@ Claude Haiku shows its lowest consistency in Humanities (~25–35%) despite its 
 ![Accuracy vs Consistency (GPT-4o-mini)](figures/acc_vs_consistency_gpt-4o-mini.png)
 ![Original vs Paraphrase Accuracy (GPT-4o-mini)](figures/orig_vs_para_accuracy_gpt-4o-mini.png)
 ![Answer Heatmap (GPT-4o-mini)](figures/answer_heatmap_gpt-4o-mini.png)
+![PAWS Flip Rate (GPT-4o-mini)](figures/paws_flip_rate_gpt-4o-mini.png)
 
 ---
 
